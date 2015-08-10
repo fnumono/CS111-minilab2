@@ -13,6 +13,32 @@
 // The number of times each application should run
 #define RUNCOUNT	320
 
+static inline void
+sys_print_char(uint16_t character) {
+	asm volatile("int %0\n"
+			: : "i" (INT_CHAR_PRINT),
+			    "a" (character)
+		 	: "cc", "memory");
+
+}
+
+static inline void
+sys_set_priority(int level) {
+	//Sets the priority level for the current process
+	asm volatile("int %0\n"
+			: : "i" (INT_SYS_USER1),
+			    "a" (level)
+			: "cc", "memory");
+}
+
+static inline void
+sys_set_time_share(int share) {
+	//Sets the time share for the current process
+	asm volatile("int %0\n"
+			: : "i" (INT_SYS_USER2),
+			    "a" (share)
+			: "cc", "memory");
+}
 
 /*****************************************************************************
  * sys_yield
@@ -62,19 +88,3 @@ sys_exit(int status)
 }
 
 #endif
-
-
-/*****************************************************************************
- * sys_priority(???)
- *
- *   IF YOU IMPLEMENT EXERCISE 4.A, NAME YOUR SYSTEM CALL sys_priority .
- *
- *****************************************************************************/
-
-
-/*****************************************************************************
- * sys_share(???)
- *
- *   IF YOU IMPLEMENT EXERCISE 4.B, NAME YOUR SYSTEM CALL sys_share .
- *
- *****************************************************************************/

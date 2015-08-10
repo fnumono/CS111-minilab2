@@ -1,5 +1,5 @@
-Name:
-UCLA ID:
+Name:Kwai Hung Shea
+UCLA ID:304497354
 
 Collaborators:
 
@@ -7,34 +7,181 @@ Collaborators:
 
 Response to Exercise 1:
 
-The name of the scheduling algorithm is:
+The name of the scheduling algorithm is: Round Robiin
 
 
 (Exercise 2 is a coding exercise)
+ 1.Add code inside schedos-kern.c
 
+   else if (scheduling_algorithm == 1) {
+          pid_t HPrior = 0;
+      	    int j;
+            while (1) {
+              for(j = 1; j < NPROCS; j++) {
+                 if(proc_array[j].p_state == P_RUNNABLE) {
+                   HPrior = j;
+                   break;
+                 }
+            }
+            if(HPrior j= 0)
+              run(&proc_array[HPrior]);
+          }
+        }
+ 2. Change the forever yielding to sys_exit(0) in schedos-1.c
+    Replace "while (1)
+ 	    sys_yield();"
+	    with "sys_exit(0);"
+
+"scheduling_algorithm = 0;" on line 130 to "scheduling_algorithm = 1;" to test.
 
 Response to Exercise 3:
 
-Average turnaround time for scheduling_algorithm 0:
+Average turnaround time for scheduling_algorithm 0: 
+schedos-1: 319*4 + 1 = 1277
+schedos-2: 319*4 + 2 = 1278
+schedos-3: 319*4 + 3 = 1279
+schedos-4: 319*4 + 4 = 1280
+Average = (1277 + 1278 + 1279 + 1280)/4 = 1278.5 ms
+
 Average turnaround time for scheduling_algorithm 1:
+schedos-1: 320
+schedos-2: 320 + 320 = 640
+schedos-3: 640 + 320 = 960
+schedos-4: 960 + 320 = 1280
+Average = (320 + 640 + 960 + 1280)/4 = 800 ms
 
 Average wait time for scheduling_algorithm 0:
-Average wait time for scheduling_algorithm 1:
+schedos-1: 0
+schedos-2: 1
+schedos-3: 2
+schedos-4: 3
+Average = (0 + 1 + 2 + 3)/4 = 1.5 ms
 
+Average wait time for scheduling_algorithm 1:
+schedos-1: 0
+schedos-2: 320
+schedos-3: 320 + 320 = 640
+schedos-4: 640 + 320 = 960
+Average = (0 + 320 + 640 + 960)/4 = 480 ms
 
 Exercise 4:
 
 Did you complete Exercise 4A, Exercise 4B, or both for extra credit?
+4A:
+Added in schedos-app.h:
+     static inline void sys_set_priority(int priority) {
+	//Sets the priority level for the current process
+	asm volatile("int %0\n"
+	: : "i" (INT_SYS_USER1),
+	"a" (priority)    //It is in %eax
+	: "cc", "memory");
+	}"
 
+Added in schedos-kern.c inside the schedule(void) funtion
 
+else if (scheduling_algorithm == 2) {
+	  int j;
+	  while(1) {
+	    pid_t highest_prior = 0;
+	    pid = (pid + 1) % NPROCS;
+	    for(j = 1; j < NPROCS; j++) {
+	      if(proc_array[j].p_state == P_RUNNABLE) {
+	        if(highest_prior == 0 || proc_array[j].p_priority <= proc_array            [highest_prior].p_priority) {
+	          }
+	     }
+	  }
+	if(  proc_array[pid].p_state == P_RUNNABLE && proc_array[pid].p_priority == proc_array[highest_prior].p_priority)
+	      run(&proc_array[pid]);
+	}
+   }
+
+Added in schedos-kern.c:
+	case INT_SYS_USER1: with
+	"case INT_SYS_USER1:
+	// 'sys_user*' are provided for your convenience, in case you
+	// want to add a system call.
+	/* Your code here (if you want). */
+	current->p_priority = reg->reg_eax;
+	schedule();"
+
+Inside schedos-kern.h:
+	Add a data member "int p_priority;" within the typedef of process
 Exercise 5:
-
+During the execution of process4
+ When a process is interrupted, it is unable to print to the screen and 4 is the first one that does not print during each cycle. The first four cycles function as normal (all processes print once), but during the fifth cycle, process 4 does not print, indicating that it was interuppted.
 
 (Exercise 6 is a coding exercise)
-
+Added in schedos-symbols.ld
+	PROVIDE(lock = 0x198004);
+Added in schedos.h
+	extern unit32_t lock
+Added in schedos-kern.c inside start(void) function
+	
+Replaced the for loop inside schedos-1.c with
+for (i = 0; i < RUNCOUNT; i++) {
+     while(atomic_swap(&lock,1)!=0) { 
+	continue;
+	}
+    *cursorpos++ = PRINTCHAR;
+    atomic_swap(&lock,0); 
+    sys_yield();
+}
 
 Anything else you'd like us to know:
 
+Exercise 7
+    I used the elevator scheduling algorithm for this exercise. 
+First it traversing to the right and will continue to schedule the next immediate process with the higher pid until it reaches the last process, then it will reverse its direction and traverse
+towards pid = 1, once there it will agian reverse its direction. My scheduling algorithm will continue
+to do this until no more process is left to run.I create a new global variable in schedos-kern.c to keep track of the current traversing direction, 0 for left, 1 for right. "int algorithm4Direction;" which is initialized to 1 in start(void). "algorithm4Direction = 1;" I also created a new case inside schedule(void) to implement my new algorithm
+	
+    else if (scheduling_algorithm == 4) { //Exercise 7 Extra-credit (elevator scheduling)
+	while(1) {
+	    if(algor_4 == 1) {
+	         if(pid == NPROCS-1)
+	            algor_4 = 0;
+	   else
+	    pid++;
+	}
+	if(algor_4 == 0) {
+	    if(pid == 1)
+	         algor_4 = 1;
+	  else {
+	   pid--;
+	   if(pid == 1)
+	       continue;
+	     }
+	}
+	if(proc_array[pid].p_state == P_RUNNABLE) {
+	  run(&proc_array[pid]);
+	  }
+	 }
+	}
+	
+Extra-Credit Exercise 8
+	
+I implemented one more way to print atomically. This time through the use of my own system call.
+I included a new system call inside schedos-app.h:
+   static inline void
+	sys_print_char(uint16_t ch) {
+     	asm volatile("int %0\n"
+	: : "i" (INT_CHAR_PRINT),
+	"a" (ch)
+	: "cc", "memory");
+	
+	}"
+	
+	Inside schedos-1.c:
+
+	Inside schedos.h:
+	I defined a new system call number "#define INT_CHAR_PRINT 52" for my new system call.
+	
+	
+	Inside schedos-kern.c I added a new case for my new system call inside the function interrupt():
+	
+	"case INT_CHAR_PRINT:
+	*cursorpos++ = reg->reg_eax;
+	schedule();	
 
 
-Extra credit exercises:
+

@@ -23,7 +23,9 @@ typedef enum procstate {
 // Process descriptor type
 typedef struct process {
 	pid_t p_pid;			// Process ID
-
+	int p_priority;			// Process' priority exercise 4A
+	int p_timeShare;		// Process' timeShare exercise 4B
+	int p_timeRan;			// Process' timeRun exercise 4B
 	registers_t p_registers;	// Current process state: registers,
 					// stack location, EIP, etc.
 					// 'registers_t' defined in x86.h
@@ -34,7 +36,7 @@ typedef struct process {
 
 
 // Clock frequency: the clock interrupt, if any, happens HZ times a second
-#define HZ			100
+#define HZ			1000
 
 // The interrupt number corresponding to the first hardware interrupt
 #define INT_HARDWARE		32

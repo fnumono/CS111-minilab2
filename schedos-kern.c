@@ -48,30 +48,18 @@ process_t *current;
 
 // The preferred scheduling algorithm.
 int scheduling_algorithm;
-
+int algorithm4Direction;
 // UNCOMMENT THESE LINES IF YOU DO EXERCISE 4.A
-// Use these #defines to initialize your implementation.
-// Changing one of these lines should change the initialization.
-// #define __PRIORITY_1__ 1
-// #define __PRIORITY_2__ 2
-// #define __PRIORITY_3__ 3
-// #define __PRIORITY_4__ 4
-
-// UNCOMMENT THESE LINES IF YOU DO EXERCISE 4.B
-// Use these #defines to initialize your implementation.
-// Changing one of these lines should change the initialization.
-// #define __SHARE_1__ 1
-// #define __SHARE_2__ 2
-// #define __SHARE_3__ 3
-// #define __SHARE_4__ 4
-
-// USE THESE VALUES FOR SETTING THE scheduling_algorithm VARIABLE.
-#define __EXERCISE_1__   0  // the initial algorithm
-#define __EXERCISE_2__   2  // strict priority scheduling (exercise 2)
-#define __EXERCISE_4A__ 41  // p_priority algorithm (exercise 4.a)
-#define __EXERCISE_4B__ 42  // p_share algorithm (exercise 4.b)
-#define __EXERCISE_7__   7  // any algorithm for exercise 7
-
+	// Use these #defines to initialize your implementation.
+	// Changing one of these lines should change the initialization.
+	//Define in the schedos-1.c
+	
+	// USE THESE VALUES FOR SETTING THE scheduling_algorithm VARIABLE.
+	#define __EXERCISE_1__ 0 // the initial algorithm
+	#define __EXERCISE_2__ 2 // strict priority scheduling (exercise 2)
+	#define __EXERCISE_4A__ 41 // p_priority algorithm (exercise 4.a)
+	#define __EXERCISE_4B__ 42 // p_share algorithm (exercise 4.b)
+	#define __EXERCISE_7__ 7 // any algorithm for exercise 7
 
 /*****************************************************************************
  * start
@@ -91,12 +79,14 @@ start(void)
 	interrupt_controller_init(0);
 	console_clear();
 
-	// Initialize process descriptors as empty
+	// Initialize process descriptors as empty and set priorities to 0
 	memset(proc_array, 0, sizeof(proc_array));
 	for (i = 0; i < NPROCS; i++) {
 		proc_array[i].p_pid = i;
 		proc_array[i].p_state = P_EMPTY;
 	}
+		/*proc_array[1].p_timeShare = 1;
+		proc_array[4].p_timeShare = 4;*/ //For testing exercise 4B
 
 	// Set up process descriptors (the proc_array[])
 	for (i = 1; i < NPROCS; i++) {
@@ -114,21 +104,26 @@ start(void)
 
 		// Mark the process as runnable!
 		proc->p_state = P_RUNNABLE;
+
+		proc->p_priority = 0; //Exercise 4A, Default to 0 for each process
+		proc->p_timeShare = 0; //Exercise 4B, Default to 0 for each process
+		proc->p_timeRan = -1; //Exercise 4B, First run is a special case
 	}
 
 	// Initialize the cursor-position shared variable to point to the
 	// console's first character (the upper left).
 	cursorpos = (uint16_t *) 0xB8000;
-
-	// Initialize the scheduling algorithm.
+	lock = 0;
+         // Initialize the scheduling algorithm.
 	// USE THE FOLLOWING VALUES:
-	//    0 = the initial algorithm
-	//    2 = strict priority scheduling (exercise 2)
-	//   41 = p_priority algorithm (exercise 4.a)
-	//   42 = p_share algorithm (exercise 4.b)
-	//    7 = any algorithm that you may implement for exercise 7
-	scheduling_algorithm = 0;
-
+	// 0 = the initial algorithm
+	// 2 = strict priority scheduling (exercise 2)
+	// 41 = p_priority algorithm (exercise 4.a)
+	// 42 = p_share algorithm (exercise 4.b)
+	// 7 = any algorithm that you may implement for exercise 7
+	// Initialize the scheduling algorithm.
+	scheduling_algorithm = 41;
+	algorithm4Direction = 1; //Exercise 7
 	// Switch to the first process.
 	run(&proc_array[1]);
 
@@ -180,26 +175,31 @@ interrupt(registers_t *reg)
 		// 'sys_user*' are provided for your convenience, in case you
 		// want to add a system call.
 		/* Your code here (if you want). */
-		run(current);
+		current->p_priority = reg->reg_eax;
+		schedule();
 
 	case INT_SYS_USER2:
 		/* Your code here (if you want). */
-		run(current);
+		current->p_timeShare = reg->reg_eax;
+		if(current->p_timeRan == -1)
+		current->p_timeRan = 0;
+		schedule();
 
 	case INT_CLOCK:
 		// A clock interrupt occurred (so an application exhausted its
 		// time quantum).
 		// Switch to the next runnable process.
 		schedule();
-
+	
+	case INT_CHAR_PRINT:
+		*cursorpos++ = reg->reg_eax;
+		schedule();
 	default:
 		while (1)
 			/* do nothing */;
 
 	}
 }
-
-
 
 /*****************************************************************************
  * schedule
@@ -219,7 +219,7 @@ schedule(void)
 {
 	pid_t pid = current->p_pid;
 
-	if (scheduling_algorithm == 0)
+	if (scheduling_algorithm == __EXERCISE_1__) //Simple Round-Robin Scheduling
 		while (1) {
 			pid = (pid + 1) % NPROCS;
 
@@ -229,7 +229,79 @@ schedule(void)
 			if (proc_array[pid].p_state == P_RUNNABLE)
 				run(&proc_array[pid]);
 		}
-
+	else if (scheduling_algorithm == __EXERCISE_2__) {
+			int i;
+			pid_t highestPriority = 0;
+		while (1) {
+			for(i = 1; i < NPROCS; i++) {
+				if(proc_array[i].p_state == P_RUNNABLE) {
+					highestPriority = i;
+					break;
+				}
+			}
+			if(highestPriority != 0)
+				run(&proc_array[highestPriority]);
+		}
+	}
+	else if (scheduling_algorithm == __EXERCISE_4A__) { //Exercise 4A (Priority scheduling)
+		int i;
+		while(1) {
+			pid_t highestPriority = 0;
+			pid = (pid + 1) % NPROCS;
+			for(i = 1; i < NPROCS; i++) {
+				if(proc_array[i].p_state == P_RUNNABLE) {
+					if(proc_array[i].p_priority <= proc_array[highestPriority].p_priority
+						 || highestPriority == 0) {
+						highestPriority = i;
+					}
+				}
+			}
+		if(proc_array[pid].p_priority == proc_array[highestPriority].p_priority 
+			&& proc_array[pid].p_state == P_RUNNABLE)
+				run(&proc_array[pid]);
+		}
+	}
+	else if (scheduling_algorithm == __EXERCISE_4B__) { //Exercise 4B (Time Share scheduling)
+		while(1) {
+			if(proc_array[pid].p_state == P_RUNNABLE) {
+				//Initial run check, since correct timeShare aren't set up yet
+				if(proc_array[pid].p_timeRan == -1 && proc_array[pid].p_timeShare == 0) {
+					run(&proc_array[pid]); //Run all processes once so they have chance to
+							       //update their timeShare values	
+				}
+				else //Normal case
+				if(proc_array[pid].p_timeRan >= proc_array[pid].p_timeShare) {
+					proc_array[pid].p_timeRan = 0;
+				}else {
+					proc_array[pid].p_timeRan++;
+					run(&proc_array[pid]);
+				}
+			}
+			pid = (pid + 1) % NPROCS;
+		}
+	}
+	else if (scheduling_algorithm == __EXERCISE_7__) { //Exercise 7 Extra-credit (elevator scheduling)
+		while(1) {
+			if(algorithm4Direction == 1) {
+				if(pid == NPROCS-1)
+					algorithm4Direction = 0;
+				else
+				pid++;
+			}
+			if(algorithm4Direction == 0) {
+				if(pid == 1)
+					algorithm4Direction = 1;
+				else {
+				pid--;
+				if(pid == 1)
+					continue;
+				}
+			}
+			if(proc_array[pid].p_state == P_RUNNABLE) {
+				run(&proc_array[pid]);
+			}
+		}
+	}
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);
 	while (1)
